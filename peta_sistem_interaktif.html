@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ITSR EtherCAT Solution Explorer</title>
+  <style>
+    :root {
+      --bg-canvas: #F8FAFC;
+      --bg-panel: #FFFFFF;
+      --bg-header: #1E293B;
+      --border-subtle: #E2E8F0;
+      --border-normal: #CBD5E1;
+      --border-dark: #64748B;
+      --text-main: #0F172A;
+      --text-muted: #64748B;
+      --text-light: #F8FAFC;
+      --card-bg: #FFFFFF;
+      --card-border: #CBD5E1;
+      --card-border-selected: #0F172A;
+      --link-stroke: #94A3B8;
+      --select-bg: #F1F5F9;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg-canvas);
+      color: var(--text-main);
+      overflow: hidden;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Minimal Top Navigation */
+    header.topbar {
+      background: var(--bg-header);
+      color: var(--text-light);
+      height: 38px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      border-bottom: 1px solid var(--border-subtle);
+      user-select: none;
+    }
+    .brand-title {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .system-status {
+      font-size: 11px;
+      color: #94A3B8;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .status-pill {
+      background: #334155;
+      color: #F8FAFC;
+      padding: 2px 8px;
+      border-radius: 3px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    /* Minimal Toolbar */
+    .toolbar {
+      background: #FFFFFF;
+      border-bottom: 1px solid var(--border-subtle);
+      height: 36px;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      gap: 6px;
+      font-size: 12px;
+    }
+    .btn {
+      background: #FFFFFF;
+      border: 1px solid var(--border-normal);
+      border-radius: 3px;
+      padding: 3px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      color: var(--text-main);
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .btn:hover {
+      background: #F1F5F9;
+      border-color: var(--border-dark);
+    }
+    .btn:active {
+      background: #E2E8F0;
+    }
+    .toolbar-divider {
+      width: 1px;
+      height: 18px;
+      background: var(--border-subtle);
+      margin: 0 4px;
+    }
+    .search-box {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .search-box input {
+      border: 1px solid var(--border-normal);
+      border-radius: 3px;
+      padding: 4px 10px;
+      font-size: 12px;
+      width: 240px;
+      outline: none;
+      color: var(--text-main);
+    }
+    .search-box input:focus {
+      border-color: #334155;
+    }
+
+    /* Workspace */
+    .workspace {
+      flex: 1;
+      display: flex;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Left Tree Sidebar */
+    .sidebar {
+      width: 290px;
+      background: var(--bg-panel);
+      border-right: 1px solid var(--border-subtle);
+      display: flex;
+      flex-direction: column;
+      user-select: none;
+      z-index: 10;
+    }
+    .sidebar-header {
+      background: #F8FAFC;
+      padding: 8px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .tree-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 6px 0;
+      font-size: 12px;
+    }
+    .tree-item {
+      padding: 5px 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      color: var(--text-main);
+      border-left: 2px solid transparent;
+    }
+    .tree-item:hover {
+      background: #F8FAFC;
+    }
+    .tree-item.active {
+      background: var(--select-bg);
+      border-left-color: #0F172A;
+      font-weight: 600;
+    }
+    .tree-indent {
+      display: inline-block;
+      width: 14px;
+    }
+
+    /* Canvas Area */
+    .canvas-wrapper {
+      flex: 1;
+      position: relative;
+      background-color: var(--bg-canvas);
+      background-image: 
+        radial-gradient(circle, #CBD5E1 1px, transparent 1px);
+      background-size: 20px 20px;
+      overflow: hidden;
+      cursor: grab;
+    }
+    .canvas-wrapper:active {
+      cursor: grabbing;
+    }
+    svg.mindmap-svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Right Inspector Panel */
+    .inspector {
+      width: 320px;
+      background: var(--bg-panel);
+      border-left: 1px solid var(--border-subtle);
+      display: flex;
+      flex-direction: column;
+      z-index: 10;
+    }
+    .inspector-header {
+      background: #F8FAFC;
+      padding: 8px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .inspector-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+    .prop-group {
+      margin-bottom: 16px;
+    }
+    .prop-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      margin-bottom: 4px;
+      letter-spacing: 0.3px;
+    }
+    .prop-val {
+      font-size: 12px;
+      color: var(--text-main);
+      word-break: break-word;
+    }
+    .prop-link {
+      display: inline-block;
+      margin-top: 4px;
+      color: #2563EB;
+      text-decoration: none;
+      font-weight: 500;
+    }
+    .prop-link:hover {
+      text-decoration: underline;
+    }
+
+    /* Node SVG Elements */
+    .node-group {
+      cursor: pointer;
+    }
+    .node-card {
+      rx: 4px;
+      ry: 4px;
+      fill: #FFFFFF;
+      stroke: #CBD5E1;
+      stroke-width: 1.2px;
+      transition: stroke 0.15s, stroke-width 0.15s;
+    }
+    .node-group:hover .node-card {
+      stroke: #64748B;
+      stroke-width: 1.5px;
+    }
+    .node-group.selected .node-card {
+      stroke: #0F172A !important;
+      stroke-width: 2px !important;
+    }
+    .node-title {
+      font-weight: 600;
+      font-size: 12px;
+      fill: #0F172A;
+      pointer-events: none;
+    }
+    .node-subtitle {
+      font-size: 11px;
+      fill: #64748B;
+      pointer-events: none;
+    }
+    .node-toggle {
+      cursor: pointer;
+    }
+    .node-toggle circle {
+      fill: #FFFFFF;
+      stroke: #94A3B8;
+      stroke-width: 1.2px;
+      transition: fill 0.15s, stroke 0.15s;
+    }
+    .node-toggle:hover circle {
+      fill: #0F172A;
+      stroke: #0F172A;
+    }
+    .node-toggle text {
+      font-size: 11px;
+      font-weight: 600;
+      fill: #64748B;
+      text-anchor: middle;
+      dominant-baseline: central;
+      pointer-events: none;
+    }
+    .node-toggle:hover text {
+      fill: #FFFFFF;
+    }
+
+    /* Link Lines */
+    path.node-link {
+      fill: none;
+      stroke: var(--link-stroke);
+      stroke-width: 1.2px;
+      stroke-linecap: round;
+      transition: stroke 0.15s, stroke-width 0.15s;
+    }
+    path.node-link.highlight {
+      stroke: #0F172A;
+      stroke-width: 2px;
+    }
+
+    /* Bottom Status Bar */
+    footer.statusbar {
+      height: 24px;
+      background: #F8FAFC;
+      border-top: 1px solid var(--border-subtle);
+      color: var(--text-muted);
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      justify-content: space-between;
+      user-select: none;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Navigation -->
+  <header class="topbar">
+    <div class="brand-title">
+      <span>ITSR EtherCAT Solution Explorer</span>
+      <span style="opacity: 0.3;">|</span>
+      <span style="font-weight: normal; font-size: 12px; color: #94A3B8;">Peta Arsitektur Sistem</span>
+    </div>
+    <div class="system-status">
+      <span class="status-pill">RUN 1.000 Hz</span>
+      <span>Protokol v8 (RxPDO 352B / TxPDO 411B)</span>
+    </div>
+  </header>
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <button class="btn" onclick="zoomIn()">Zoom In</button>
+    <button class="btn" onclick="zoomOut()">Zoom Out</button>
+    <button class="btn" onclick="resetZoom()">Reset</button>
+    <button class="btn" onclick="fitView()">Pas Layar</button>
+    <div class="toolbar-divider"></div>
+    <button class="btn" onclick="expandAll()">Buka Semua</button>
+    <button class="btn" onclick="collapseAll()">Lipat Semua</button>
+    
+    <div class="search-box">
+      <label for="searchInput" style="font-size: 11px; color: var(--text-muted);">Cari:</label>
+      <input type="text" id="searchInput" placeholder="Ketik nama modul, motor, LAN9252..." oninput="handleSearch(this.value)">
+    </div>
+  </div>
+
+  <!-- Workspace Container -->
+  <div class="workspace">
+    
+    <!-- Tree Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">Pohon Modul Sistem</div>
+      <div class="tree-container" id="solutionTree">
+        <!-- Rendered by JS -->
+      </div>
+    </aside>
+
+    <!-- Canvas SVG Mind Map -->
+    <main class="canvas-wrapper" id="canvasWrapper">
+      <svg class="mindmap-svg" id="mindmapSvg">
+        <g id="viewport">
+          <g id="linksGroup"></g>
+          <g id="nodesGroup"></g>
+        </g>
+      </svg>
+    </main>
+
+    <!-- Right Inspector Panel -->
+    <aside class="inspector" id="inspectorPanel">
+      <div class="inspector-header">Detail Properti Modul</div>
+      <div class="inspector-body" id="inspectorBody">
+        <div style="color: var(--text-muted); font-style: italic; text-align: center; margin-top: 30px;">
+          Pilih salah satu kotak modul pada diagram atau daftar kiri untuk melihat detail spesifikasi dan dokumen rujukannya.
+        </div>
+      </div>
+    </aside>
+
+  </div>
+
+  <!-- Status Bar -->
+  <footer class="statusbar">
+    <div style="display: flex; gap: 16px;">
+      <span>Status: Normal</span>
+      <span>Deterministik: 1.000 µs (1 kHz)</span>
+      <span>Bus: Raw Socket Layer-2 0x88A4</span>
+    </div>
+    <div>
+      <span>ITSR EtherCAT Master & Firmware Architecture</span>
+    </div>
+  </footer>
+
+  <script>
+    // Data Arsitektur Sistem ITSR (Neutral Clean Data Model)
+    const dataModel = {
+      id: "root",
+      name: "ITSR EtherCAT Solution",
+      sub: "Arsitektur Master & Firmware",
+      desc: "Sistem kendali robot terdistribusi berbasis standar EtherCAT dengan siklus deterministik 1.000 Hz.",
+      specs: "Protokol v8, 1 kHz PDO, CoE Mailbox SDO, FoE Bootloader",
+      doc: "docs/MULAI_DI_SINI.md",
+      code: "README.md",
+      children: [
+        {
+          id: "sys",
+          name: "SYSTEM: PC Master (Linux RT)",
+          sub: "C++20 Engine (itsr_ecat_master)",
+          desc: "Komputer PC Linux RT yang mengorkestrasi frame Layer-2 raw socket tiap 1 ms.",
+          specs: "Linux PREEMPT_RT, SCHED_FIFO 80, Raw Socket 0x88A4",
+          doc: "docs/struktur_kode.md",
+          code: "src/Ethercat/",
+          children: [
+            {
+              id: "sys_core",
+              name: "Pustaka Inti (libecat_core.a)",
+              sub: "Komponen Inti C++20",
+              desc: "Pustaka C++20 berkinerja tinggi bebas alokasi memori dinamis saat loop berjalan.",
+              specs: "EcatMaster, EcatApi, RtCyclicThread",
+              doc: "docs/PANDUAN_API_CPP.md",
+              code: "src/Ethercat/libecat_core.cpp"
+            },
+            {
+              id: "sys_cli",
+              name: "CLI Interaktif (ecat_tool)",
+              sub: "Aplikasi Operasional Terminal",
+              desc: "Utilitas terminal mandiri untuk diagnostik motor, rearm, dan monitor telemetri.",
+              specs: "Monitor 16 slot, rearm all, motor enable/disable",
+              doc: "apps/ecat_tool/README.md",
+              code: "apps/ecat_tool/cli/main.cpp"
+            },
+            {
+              id: "sys_ros2",
+              name: "Jembatan ROS 2 (Humble)",
+              sub: "Paket itsr_ecat_bridge",
+              desc: "Menerjemahkan data EtherCAT ke topik standar ROS 2 (/ecat/motor_states, /ecat/cmd_vel).",
+              specs: "ROS 2 Humble / Iron, C++ Component Node",
+              doc: "integrations/ros2/README.md",
+              code: "integrations/ros2/itsr_ecat_bridge/"
+            },
+            {
+              id: "sys_gui",
+              name: "Web EEPROM Workbench",
+              sub: "Generator SII & Editor SDO",
+              desc: "Antarmuka web lokal untuk kustomisasi EEPROM biner dan pengelolaan Kamus Objek.",
+              specs: "Node.js REST API + HTML5 Workbench",
+              doc: "docs/PANDUAN_GUI_EEPROM.md",
+              code: "scripts/gui_eeprom"
+            }
+          ]
+        },
+        {
+          id: "motion",
+          name: "MOTION: Kendali 16 Motor",
+          sub: "Manajer Slot & Inverter Lapangan",
+          desc: "Manajemen 16 slot motor multi-pabrikan dengan sinkronisasi deterministik 1 ms.",
+          specs: "16 Slot Virtual, Slew-Rate Limiter, Q16 Fixed-Point",
+          doc: "docs/ANALISIS_PDO.md",
+          code: "Core/Motors/",
+          children: [
+            {
+              id: "motion_can1",
+              name: "Bus FDCAN1 (Slot 0..7)",
+              sub: "Motor Roda & Penggerak Swerve",
+              desc: "Kanal bus CAN utama untuk motor traksi roda dan kemudi sudut robot.",
+              specs: "FDCAN1 Classic Mode 1 Mbps, ID Guard Filter",
+              doc: "src/Protocol/CAN/README.md",
+              code: "Core/Protocol/CAN/can_bus1.c"
+            },
+            {
+              id: "motion_can2",
+              name: "Bus FDCAN2 (Slot 8..15)",
+              sub: "Motor Artikulasi & Gripper",
+              desc: "Kanal bus CAN kedua untuk motor pengangkat lengan dan aktuator penjepit.",
+              specs: "FDCAN2 Classic Mode 1 Mbps, Jalur Terisolasi",
+              doc: "src/Protocol/CAN/README.md",
+              code: "Core/Protocol/CAN/can_bus2.c"
+            },
+            {
+              id: "motion_drivers",
+              name: "Multi-Driver Engine",
+              sub: "Damiao, RoboMaster, RobStride",
+              desc: "Abstraksi terpadu yang memetakan perintah generik master ke protokol motor spesifik.",
+              specs: "Damiao MIT, DJI C610/C620, RobStride RS06",
+              doc: "Core/Motors/README.md",
+              code: "Core/Motors/motor_manager.cpp"
+            }
+          ]
+        },
+        {
+          id: "plc",
+          name: "PLC: Firmware Slave (STM32G0B1)",
+          sub: "Kompilasi Bare-Metal (ETHERCAT_SERIAL_TERMINAL)",
+          desc: "Firmware bare-metal Cortex-M0+ 64 MHz yang menghubungkan LAN9252 dengan aktuator.",
+          specs: "STM32G0B1KET6, Flash 128KB, RAM 144KB, Clock 64MHz",
+          doc: "REFERENSI_KODE_FIRMWARE.md",
+          code: "Core/App/app.cpp",
+          children: [
+            {
+              id: "plc_soes",
+              name: "Tumpukan Protokol SOES",
+              sub: "Simple Open EtherCAT Slave v3.1.0",
+              desc: "Tumpukan protokol slave untuk transisi ESM, CoE SDO, dan FoE Bootloader.",
+              specs: "SOES v3.1.0 (Commit 591d08d), Patch Vendor ITSR",
+              doc: "SOES.md",
+              code: "SOES/soes/ecat_slv.c"
+            },
+            {
+              id: "plc_hw",
+              name: "Jembatan Hardware LAN9252",
+              sub: "Driver SPI1 DMA 32 MHz",
+              desc: "Akses register CSR (<0x1000) dan FIFO Process Data RAM (>=0x1000) via SPI DMA.",
+              specs: "SPI1 Mode 0 (32 MHz), Workaround PDI Lock 0x1200",
+              doc: "Core/Ethercat/README.md",
+              code: "Core/Ethercat/esc_hw.c"
+            },
+            {
+              id: "plc_fast_pdo",
+              name: "Akselerator Fast PDO",
+              sub: "Bypass Dinamis DIG_process()",
+              desc: "Direct memory copy yang memangkas waktu proses data dari ~200 µs ke ~10 µs.",
+              specs: "1 Blok RxPDO (352B), 5 Blok TxPDO (411B)",
+              doc: "SOES.md#7-akselerasi-fast-pdo-vs-sinkronisasi-standar-soes-bypass-dinamis-demi-1-khz",
+              code: "Core/Ethercat/pdo_fast.c"
+            },
+            {
+              id: "plc_boot",
+              name: "Bootloader FoE Mandiri",
+              sub: "File over EtherCAT Flashing",
+              desc: "Bootloader mandiri berukuran <10 KB untuk pembaruan biner via kabel LAN.",
+              specs: "Flash Halaman 0..4, Verifikasi CRC32 Hardware",
+              doc: "docs/PANDUAN_FLASH_FOE.md",
+              code: "Bootloader/boot_foe.c"
+            }
+          ]
+        },
+        {
+          id: "io",
+          name: "I/O: Rantai Papan Lapangan",
+          sub: "Topologi Daisy-Chain Kabel LAN RJ45",
+          desc: "Perangkat keras slave yang terhubung secara berantai lewat kabel Ethernet.",
+          specs: "100BASE-TX 100 Mbps, Full Duplex",
+          doc: "docs/CATATAN_HARDWARE_LINK_ANTAR_PAPAN.md",
+          code: "boards/README.md",
+          children: [
+            {
+              id: "io_papan1",
+              name: "Papan 1: Distribusi Daya",
+              sub: "Product ID: 0x00000001",
+              desc: "Papan pasif pembagi daya baterai utama ke rangkaian kontroler dan inverter.",
+              specs: "Regulator Step-down, Proteksi Sekring Fuse",
+              doc: "boards/power/README.md",
+              code: "boards/power/"
+            },
+            {
+              id: "io_papan2",
+              name: "Papan 2: Gateway Serial (ed6xxx)",
+              sub: "Product ID: 0x00000002",
+              desc: "Papan penggerak 16 motor, pembaca gyro IMU TL740D, dan expander GPIO I2C.",
+              specs: "STM32G0B1 + Microchip LAN9252 ESC",
+              doc: "boards/serial/README.md",
+              code: "boards/serial/"
+            },
+            {
+              id: "io_papan3",
+              name: "Papan 3: Input Digital (ED1819)",
+              sub: "Product ID: 0x00000003",
+              desc: "Papan I/O murni LAN9252 tanpa MCU untuk membaca 16 limit switch / proximity.",
+              specs: "Optocoupler Terisolasi 24V, 16 Pin Digital",
+              doc: "boards/input/README.md",
+              code: "boards/input/SKEMATIK_ED1819.md"
+            },
+            {
+              id: "io_sensors",
+              name: "Sensor & Periferal Eksternal",
+              sub: "IMU TL740D & Expander PCF8574",
+              desc: "Sensor orientasi sudut kemiringan (RS485) dan pembaca status switch (I2C).",
+              specs: "LPUART1 RS485 (PA4 DE-RE), I2C Fast Mode 400kHz",
+              doc: "docs/terminal_serial.md",
+              code: "Core/Protocol/UART/uart_imu.c"
+            }
+          ]
+        }
+      ]
+    };
+
+    // State Visualizer
+    let currentScale = 1.0;
+    let panX = 40;
+    let panY = 260;
+    let isDragging = false;
+    let startX, startY;
+    let selectedNodeId = "root";
+
+    const nodeWidth = 230;
+    const nodeHeight = 52;
+    const horizontalGap = 70;
+    const verticalGap = 16;
+
+    function initCollapsed(node) {
+      node.collapsed = false;
+      if (node.children) {
+        node.children.forEach(initCollapsed);
+      }
+    }
+    initCollapsed(dataModel);
+
+    function calculateLayout(node, startX, startY) {
+      node.x = startX;
+      
+      if (!node.children || node.children.length === 0 || node.collapsed) {
+        node.y = startY;
+        node.totalHeight = nodeHeight;
+        return nodeHeight;
+      }
+
+      let currentChildY = startY;
+      let totalH = 0;
+      node.children.forEach((child, index) => {
+        const childH = calculateLayout(child, startX + nodeWidth + horizontalGap, currentChildY);
+        currentChildY += childH + verticalGap;
+        totalH += childH + (index > 0 ? verticalGap : 0);
+      });
+
+      node.totalHeight = totalH;
+      node.y = startY + (totalH / 2) - (nodeHeight / 2);
+      return totalH;
+    }
+
+    function renderSvg() {
+      calculateLayout(dataModel, 40, 20);
+
+      const linksGroup = document.getElementById("linksGroup");
+      const nodesGroup = document.getElementById("nodesGroup");
+      linksGroup.innerHTML = "";
+      nodesGroup.innerHTML = "";
+
+      function drawNode(node) {
+        const isSelected = (node.id === selectedNodeId);
+
+        const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        g.setAttribute("class", "node-group" + (isSelected ? " selected" : ""));
+        g.setAttribute("transform", `translate(${node.x}, ${node.y})`);
+        g.onclick = (e) => {
+          e.stopPropagation();
+          selectNode(node);
+        };
+
+        const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        rect.setAttribute("class", "node-card");
+        rect.setAttribute("width", nodeWidth);
+        rect.setAttribute("height", nodeHeight);
+
+        const title = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        title.setAttribute("class", "node-title");
+        title.setAttribute("x", 12);
+        title.setAttribute("y", 22);
+        title.textContent = node.name;
+
+        const sub = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        sub.setAttribute("class", "node-subtitle");
+        sub.setAttribute("x", 12);
+        sub.setAttribute("y", 38);
+        sub.textContent = node.sub;
+
+        g.appendChild(rect);
+        g.appendChild(title);
+        g.appendChild(sub);
+
+        if (node.children && node.children.length > 0) {
+          const toggleG = document.createElementNS("http://www.w3.org/2000/svg", "g");
+          toggleG.setAttribute("class", "node-toggle");
+          toggleG.setAttribute("transform", `translate(${nodeWidth}, ${nodeHeight / 2})`);
+          toggleG.onclick = (e) => {
+            e.stopPropagation();
+            node.collapsed = !node.collapsed;
+            renderSvg();
+            renderTree();
+          };
+
+          const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+          circle.setAttribute("r", 8);
+
+          const sign = document.createElementNS("http://www.w3.org/2000/svg", "text");
+          sign.textContent = node.collapsed ? "+" : "−";
+
+          toggleG.appendChild(circle);
+          toggleG.appendChild(sign);
+          g.appendChild(toggleG);
+        }
+
+        nodesGroup.appendChild(g);
+
+        if (node.children && !node.collapsed) {
+          node.children.forEach(child => {
+            const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            path.setAttribute("class", "node-link" + (isSelected || child.id === selectedNodeId ? " highlight" : ""));
+            
+            const startX = node.x + nodeWidth;
+            const startY = node.y + (nodeHeight / 2);
+            const endX = child.x;
+            const endY = child.y + (nodeHeight / 2);
+            const midX = (startX + endX) / 2;
+
+            const d = `M ${startX} ${startY} C ${midX} ${startY}, ${midX} ${endY}, ${endX} ${endY}`;
+            path.setAttribute("d", d);
+            linksGroup.appendChild(path);
+
+            drawNode(child);
+          });
+        }
+      }
+
+      drawNode(dataModel);
+      updateTransform();
+    }
+
+    function renderTree() {
+      const container = document.getElementById("solutionTree");
+      container.innerHTML = "";
+
+      function createTreeItem(node, depth = 0) {
+        const item = document.createElement("div");
+        item.className = "tree-item" + (node.id === selectedNodeId ? " active" : "");
+        item.onclick = () => {
+          selectNode(node);
+          centerOnNode(node);
+        };
+
+        let indents = "";
+        for (let i = 0; i < depth; i++) {
+          indents += `<span class="tree-indent"></span>`;
+        }
+
+        const bullet = (node.children && node.children.length > 0) ? "•" : "–";
+        item.innerHTML = `${indents}<span style="color:#94A3B8; font-size:10px;">${bullet}</span> <span>${node.name}</span>`;
+        container.appendChild(item);
+
+        if (node.children && !node.collapsed) {
+          node.children.forEach(c => createTreeItem(c, depth + 1));
+        }
+      }
+
+      createTreeItem(dataModel, 0);
+    }
+
+    function selectNode(node) {
+      selectedNodeId = node.id;
+      renderTree();
+      renderSvg();
+
+      const body = document.getElementById("inspectorBody");
+
+      body.innerHTML = `
+        <div style="border-bottom: 1px solid var(--border-subtle); padding-bottom: 10px; margin-bottom: 14px;">
+          <div style="font-weight: 600; font-size: 13px; color: var(--text-main);">${node.name}</div>
+          <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">${node.sub}</div>
+        </div>
+
+        <div class="prop-group">
+          <div class="prop-label">Deskripsi</div>
+          <div class="prop-val">${node.desc}</div>
+        </div>
+
+        <div class="prop-group">
+          <div class="prop-label">Spesifikasi Teknis</div>
+          <div class="prop-val">${node.specs}</div>
+        </div>
+
+        <div class="prop-group">
+          <div class="prop-label">Dokumentasi Rujukan</div>
+          <a class="prop-link" href="../${node.doc}" target="_blank">Buka Dokumen: ${node.doc}</a>
+        </div>
+
+        <div class="prop-group">
+          <div class="prop-label">Kode Sumber Terkait</div>
+          <div class="prop-val"><code>${node.code}</code></div>
+        </div>
+      `;
+    }
+
+    function centerOnNode(node) {
+      panX = 180 - (node.x * currentScale);
+      panY = 240 - (node.y * currentScale);
+      updateTransform();
+    }
+
+    function updateTransform() {
+      const vp = document.getElementById("viewport");
+      vp.setAttribute("transform", `translate(${panX}, ${panY}) scale(${currentScale})`);
+    }
+
+    function zoomIn() {
+      currentScale = Math.min(currentScale * 1.2, 2.5);
+      updateTransform();
+    }
+    function zoomOut() {
+      currentScale = Math.max(currentScale / 1.2, 0.4);
+      updateTransform();
+    }
+    function resetZoom() {
+      currentScale = 1.0;
+      panX = 40;
+      panY = 260;
+      updateTransform();
+    }
+    function fitView() {
+      currentScale = 0.75;
+      panX = 20;
+      panY = 120;
+      updateTransform();
+    }
+
+    function expandAll() {
+      function setExp(node) {
+        node.collapsed = false;
+        if (node.children) node.children.forEach(setExp);
+      }
+      setExp(dataModel);
+      renderSvg();
+      renderTree();
+    }
+
+    function collapseAll() {
+      function setCol(node) {
+        if (node !== dataModel) node.collapsed = true;
+        if (node.children) node.children.forEach(setCol);
+      }
+      setCol(dataModel);
+      renderSvg();
+      renderTree();
+    }
+
+    function handleSearch(term) {
+      if (!term.trim()) return;
+      term = term.toLowerCase();
+
+      function findMatch(node) {
+        if (node.name.toLowerCase().includes(term) || 
+            node.sub.toLowerCase().includes(term) || 
+            node.desc.toLowerCase().includes(term)) {
+          return node;
+        }
+        if (node.children) {
+          for (let c of node.children) {
+            let res = findMatch(c);
+            if (res) {
+              node.collapsed = false;
+              return res;
+            }
+          }
+        }
+        return null;
+      }
+
+      const match = findMatch(dataModel);
+      if (match) {
+        selectNode(match);
+        centerOnNode(match);
+      }
+    }
+
+    const wrapper = document.getElementById("canvasWrapper");
+    wrapper.addEventListener("mousedown", (e) => {
+      if (e.target.closest(".node-group") || e.target.closest(".node-toggle")) return;
+      isDragging = true;
+      startX = e.clientX - panX;
+      startY = e.clientY - panY;
+    });
+
+    window.addEventListener("mousemove", (e) => {
+      if (!isDragging) return;
+      panX = e.clientX - startX;
+      panY = e.clientY - startY;
+      updateTransform();
+    });
+
+    window.addEventListener("mouseup", () => {
+      isDragging = false;
+    });
+
+    wrapper.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+      currentScale = Math.max(0.4, Math.min(2.5, currentScale * zoomFactor));
+      updateTransform();
+    }, { passive: false });
+
+    renderSvg();
+    renderTree();
+    selectNode(dataModel);
+  </script>
+</body>
+</html>
